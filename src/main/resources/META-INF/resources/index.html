@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Quản lý Bán hàng Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --admin: #e74c3c; }
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .sidebar { background: var(--primary); min-height: 100vh; color: white; position: sticky; top: 0; transition: all 0.3s; }
+        .nav-link { color: rgba(255,255,255,0.7); margin: 5px 0; border-radius: 8px; cursor: pointer; }
+        .nav-link:hover, .nav-link.active { background: var(--accent) !important; color: white !important; }
+        .admin-mode .nav-link.active { background: var(--admin) !important; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); }
+        .hidden { display: none !important; }
+        .auth-container { max-width: 400px; margin-top: 100px; }
+        .stat-card { border-left: 5px solid var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="modal fade" id="cartModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-shopping-cart me-2"></i> Giỏ hàng của bạn</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <table class="table align-middle">
+                    <thead><tr><th>Sản phẩm</th><th class="text-center">Số lượng</th><th class="text-end">Xóa</th></tr></thead>
+                    <tbody id="cartTableBody"></tbody>
+                </table>
+                <div id="cartEmptyMsg" class="text-center py-3 text-muted hidden">Giỏ hàng trống!</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                <button type="button" class="btn btn-primary" onclick="processOrder()">Xác nhận thanh toán</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="prodModalTitle">Cập nhật sản phẩm</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="prodId">
+                <div class="mb-3"><label class="form-label">Tên sản phẩm</label><input type="text" id="prodName" class="form-control"></div>
+                <div class="mb-3"><label class="form-label">Giá tiền (VNĐ)</label><input type="number" id="prodPrice" class="form-control"></div>
+                <div class="mb-3"><label class="form-label">Số lượng tồn kho</label><input type="number" id="prodStock" class="form-control"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-danger" onclick="saveProduct()">Lưu dữ liệu</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="authPage" class="container auth-container">
+    <div class="card p-4 shadow-lg border-top border-primary border-4">
+        <div class="text-center mb-4"><i class="fas fa-shopping-bag fa-3x text-primary mb-2"></i><h3 class="fw-bold">Hệ thống Sales</h3></div>
+        <div id="loginForm">
+            <input type="text" id="loginUser" class="form-control mb-3" placeholder="Tên đăng nhập" value="sinhvien">
+            <input type="password" id="loginPass" class="form-control mb-3" placeholder="Mật khẩu" value="123">
+            <button class="btn btn-primary w-100 py-2" onclick="login()">Đăng nhập</button>
+        </div>
+    </div>
+</div>
+
+<div id="mainPage" class="container-fluid hidden">
+    <div class="row">
+        <div class="col-md-2 sidebar p-3 shadow">
+            <h4 class="text-center mb-4 fw-bold">PRO DASHBOARD</h4>
+            <nav class="nav flex-column">
+                <a class="nav-link active" id="nav-shop" onclick="showTab('shop')"><i class="fas fa-box-open me-2"></i>Cửa hàng</a>
+                <a class="nav-link" id="nav-orders" onclick="showTab('orders')"><i class="fas fa-history me-2"></i>Lịch sử mua hàng</a>
+                <a class="nav-link" id="nav-stats" onclick="showTab('stats')"><i class="fas fa-chart-line me-2"></i>Thống kê doanh thu</a>
+                <a class="nav-link text-warning mt-5" onclick="location.reload()"><i class="fas fa-sign-out-alt me-2"></i>Đăng xuất</a>
+            </nav>
+        </div>
+
+        <div class="col-md-10 p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <h2 id="tabTitle" class="fw-bold m-0">Cửa hàng</h2>
+                <div class="d-flex align-items-center">
+                    <span class="me-3">Chào, <strong id="userDisplay" class="text-primary"></strong></span>
+                    <button id="cartBtn" class="btn btn-warning position-relative" onclick="openCart()">
+                        <i class="fas fa-shopping-cart"></i> Giỏ hàng
+                        <span id="cartCount" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">0</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="tab-shop" class="tab-content row g-4"></div>
+
+            <div id="tab-orders" class="tab-content hidden">
+                <div class="card p-3 shadow-sm">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light"><tr><th>Mã đơn</th><th>Ngày đặt</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead>
+                        <tbody id="orderTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="tab-stats" class="tab-content hidden">
+                <div class="row g-4" id="statsArea"></div>
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <div class="card p-4 shadow-sm h-100">
+                            <h5 class="fw-bold mb-3"><i class="fas fa-chart-bar me-2 text-primary"></i>Biểu đồ doanh thu tháng</h5>
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card p-4 shadow-sm h-100">
+                            <h5 class="fw-bold mb-3"><i class="fas fa-list-ol me-2 text-primary"></i>Chi tiết số liệu</h5>
+                            <table class="table table-sm small">
+                                <thead><tr><th>Tháng/Năm</th><th class="text-end">Doanh thu</th></tr></thead>
+                                <tbody id="monthlyTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    let authHeader = "", cart = [], currentUser = null, cModal, pModal, myChart;
+
+    window.onload = () => {
+        cModal = new bootstrap.Modal(document.getElementById('cartModal'));
+        pModal = new bootstrap.Modal(document.getElementById('productModal'));
+    };
+
+    async function login() {
+        const u = document.getElementById('loginUser').value, p = document.getElementById('loginPass').value;
+        authHeader = 'Basic ' + btoa(u + ":" + p);
+        try {
+            const res = await fetch('/api/auth/me', { headers: { 'Authorization': authHeader } });
+            if(!res.ok) throw new Error();
+            currentUser = await res.json();
+            document.getElementById('authPage').classList.add('hidden');
+            document.getElementById('mainPage').classList.remove('hidden');
+            document.getElementById('userDisplay').innerText = currentUser.username;
+
+            // Phân quyền hiển thị tab
+            if(currentUser.role === 'admin') {
+                document.getElementById('nav-stats').classList.remove('hidden');
+                document.getElementById('cartBtn').classList.add('hidden');
+            } else {
+                document.getElementById('nav-stats').classList.add('hidden');
+                document.getElementById('cartBtn').classList.remove('hidden');
+            }
+            showTab('shop');
+        } catch(e) { alert("Sai thông tin đăng nhập!"); }
+    }
+
+    function showTab(t) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + t).classList.remove('hidden');
+        document.getElementById('nav-' + t).classList.add('active');
+        document.getElementById('tabTitle').innerText = t === 'shop' ? 'Cửa hàng' : (t === 'orders' ? 'Lịch sử mua hàng' : 'Thống kê doanh thu');
+
+        if(t === 'shop') loadProducts();
+        if(t === 'orders') loadOrders();
+        if(t === 'stats') loadStats();
+    }
+
+    async function loadProducts() {
+        const res = await fetch('/api/products', { headers: { 'Authorization': authHeader } });
+        const data = await res.json();
+        const container = document.getElementById('tab-shop');
+
+        if(currentUser.role === 'admin') {
+            container.innerHTML = `
+                <div class="col-12 text-end mb-3"><button class="btn btn-success" onclick="openProdForm()">+ Thêm sản phẩm</button></div>
+                <div class="col-12"><div class="card p-3 shadow-sm"><table class="table align-middle">
+                <thead><tr><th>ID</th><th>Tên</th><th>Giá</th><th>Tồn kho</th><th>Hành động</th></tr></thead>
+                <tbody>${data.map(p => `<tr><td>${p.id}</td><td><b>${p.name}</b></td><td>${(p.price||0).toLocaleString()}đ</td><td>${p.stockQuantity}</td>
+                <td><button class="btn btn-sm btn-info text-white" onclick='openProdForm(${JSON.stringify(p)})'>Sửa</button></td></tr>`).join('')}</tbody></table></div></div>`;
+        } else {
+            container.innerHTML = data.map(p => `
+                <div class="col-md-3"><div class="card p-3 h-100 text-center">
+                    <i class="fas fa-box fa-3x mb-3 text-muted"></i>
+                    <h6 class="fw-bold">${p.name}</h6>
+                    <h5 class="text-danger fw-bold">${(p.price||0).toLocaleString()}đ</h5>
+                    <button class="btn btn-primary w-100 mt-3" onclick="addToCart(${p.id}, '${p.name}')">Mua ngay</button>
+                </div></div>`).join('');
+        }
+    }
+
+    function addToCart(id, name) {
+        const item = cart.find(i => i.productId === id);
+        if(item) item.quantity++; else cart.push({ productId: id, name: name, quantity: 1 });
+        document.getElementById('cartCount').innerText = cart.length;
+    }
+
+    function openCart() {
+        const body = document.getElementById('cartTableBody');
+        document.getElementById('cartEmptyMsg').classList.toggle('hidden', cart.length > 0);
+        body.innerHTML = cart.map((i, idx) => `<tr><td>${i.name}</td><td class="text-center">x${i.quantity}</td>
+        <td class="text-end"><button class="btn btn-sm btn-link text-danger" onclick="cart.splice(${idx},1);openCart()">Xóa</button></td></tr>`).join('');
+        cModal.show();
+    }
+
+    async function processOrder() {
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customerId: currentUser.id, items: cart })
+        });
+        if(res.ok) { alert("Đặt hàng thành công!"); cart = []; cModal.hide(); showTab('orders'); }
+    }
+
+    async function loadOrders() {
+        try {
+            const url = (currentUser.role === 'admin') ? '/api/orders/all' : '/api/orders';
+            const res = await fetch(url, { headers: { 'Authorization': authHeader } });
+            const data = await res.json();
+            const tableBody = document.getElementById('orderTable');
+
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">Chưa có đơn hàng nào.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = data.map(o => `
+                <tr>
+                    <td class="fw-bold text-primary">#ORD-${o.id}</td>
+                    <td>${o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : 'N/A'}</td>
+                    <td class="fw-bold text-danger">${(o.totalAmount || 0).toLocaleString()} đ</td>
+                    <td><span class="badge bg-success">Thành công</span></td>
+                </tr>`).join('');
+        } catch (e) {
+            document.getElementById('orderTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Lỗi kết nối máy chủ!</td></tr>';
+        }
+    }
+
+    async function loadStats() {
+        try {
+            // 1. Load Tổng quát
+            const resStats = await fetch('/api/statistics', { headers: { 'Authorization': authHeader } });
+            const d = await resStats.json();
+            document.getElementById('statsArea').innerHTML = `
+                <div class="col-md-6"><div class="card p-4 stat-card"><h6>Doanh thu tổng</h6><h3>${(d.totalRevenue||0).toLocaleString()} VNĐ</h3></div></div>
+                <div class="col-md-6"><div class="card p-4 stat-card" style="border-color: #27ae60"><h6>Số đơn hàng</h6><h3>${d.totalOrders||0}</h3></div></div>`;
+
+            // 2. Load Doanh thu tháng
+            const resMonthly = await fetch('/api/statistics/monthly', { headers: { 'Authorization': authHeader } });
+            const monthlyData = await resMonthly.json();
+
+            // Sắp xếp dữ liệu theo thời gian tăng dần để vẽ biểu đồ
+            const sortedData = [...monthlyData].reverse();
+            const labels = sortedData.map(row => `T${row[0]}/${row[1]}`);
+            const values = sortedData.map(row => row[2]);
+
+            // Cập nhật Bảng số liệu
+            document.getElementById('monthlyTableBody').innerHTML = monthlyData.map(row => `
+                <tr><td>Tháng ${row[0]}/${row[1]}</td><td class="text-end fw-bold">${row[2].toLocaleString()}đ</td></tr>
+            `).join('');
+
+            // Vẽ Biểu đồ
+            if (myChart) myChart.destroy(); // Xóa biểu đồ cũ nếu có
+            const ctx = document.getElementById('revenueChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Doanh thu (VNĐ)',
+                        data: values,
+                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        } catch (e) { console.error("Lỗi thống kê:", e); }
+    }
+
+    // CRUD Admin sản phẩm (rút gọn)
+    function openProdForm(p = null) {
+        document.getElementById('prodId').value = p ? p.id : '';
+        document.getElementById('prodName').value = p ? p.name : '';
+        document.getElementById('prodPrice').value = p ? p.price : '';
+        document.getElementById('prodStock').value = p ? p.stockQuantity : '';
+        pModal.show();
+    }
+    async function saveProduct() {
+        const id = document.getElementById('prodId').value;
+        const prod = {
+            name: document.getElementById('prodName').value,
+            price: parseFloat(document.getElementById('prodPrice').value),
+            stockQuantity: parseInt(document.getElementById('prodStock').value)
+        };
+        const res = await fetch(id ? `/api/products/${id}` : '/api/products', {
+            method: id ? 'PUT' : 'POST',
+            headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(prod)
+        });
+        if(res.ok) { pModal.hide(); loadProducts(); }
+    }
+</script>
+</body>
+</html>
