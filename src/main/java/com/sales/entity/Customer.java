@@ -6,7 +6,7 @@ import jakarta.persistence.*;
 @Entity
 public class Customer extends PanacheEntityBase {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // Xóa dòng @GeneratedValue ở đây để có thể dùng chung ID với bảng User
     public Long id;
 
     public String name;

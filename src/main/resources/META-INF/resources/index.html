@@ -13,7 +13,6 @@
         .sidebar { background: var(--primary); min-height: 100vh; color: white; position: sticky; top: 0; transition: all 0.3s; }
         .nav-link { color: rgba(255,255,255,0.7); margin: 5px 0; border-radius: 8px; cursor: pointer; }
         .nav-link:hover, .nav-link.active { background: var(--accent) !important; color: white !important; }
-        .admin-mode .nav-link.active { background: var(--admin) !important; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
         .card:hover { transform: translateY(-5px); }
         .hidden { display: none !important; }
@@ -40,6 +39,35 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
                 <button type="button" class="btn btn-primary" onclick="processOrder()">Xác nhận thanh toán</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="registerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Đăng ký tài khoản mới</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Tên đăng nhập</label>
+                    <input type="text" id="regUser" class="form-control" placeholder="nguyenvana">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Mật khẩu</label>
+                    <input type="password" id="regPass" class="form-control" placeholder="Mật khẩu ít nhất 6 ký tự">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Họ và tên</label>
+                    <input type="text" id="regFullName" class="form-control" placeholder="Nguyễn Văn A">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                <button type="button" class="btn btn-success text-white" onclick="handleRegister()">Xác nhận đăng ký</button>
             </div>
         </div>
     </div>
@@ -72,7 +100,11 @@
         <div id="loginForm">
             <input type="text" id="loginUser" class="form-control mb-3" placeholder="Tên đăng nhập" value="sinhvien">
             <input type="password" id="loginPass" class="form-control mb-3" placeholder="Mật khẩu" value="123">
-            <button class="btn btn-primary w-100 py-2" onclick="login()">Đăng nhập</button>
+            <button class="btn btn-primary w-100 py-2 mb-3" onclick="login()">Đăng nhập</button>
+            <div class="text-center">
+                <span class="small text-muted">Chưa có tài khoản?</span>
+                <a href="#" class="small fw-bold text-decoration-none" onclick="rModal.show()">Đăng ký ngay</a>
+            </div>
         </div>
     </div>
 </div>
@@ -117,14 +149,14 @@
                 <div class="row mt-4">
                     <div class="col-md-8">
                         <div class="card p-4 shadow-sm h-100">
-                            <h5 class="fw-bold mb-3"><i class="fas fa-chart-bar me-2 text-primary"></i>Biểu đồ doanh thu tháng</h5>
+                            <h5 class="fw-bold mb-3 text-primary">Biểu đồ doanh thu tháng</h5>
                             <canvas id="revenueChart"></canvas>
                         </div>
                     </div>
                     <div class="col-md-4">
                         <div class="card p-4 shadow-sm h-100">
-                            <h5 class="fw-bold mb-3"><i class="fas fa-list-ol me-2 text-primary"></i>Chi tiết số liệu</h5>
-                            <table class="table table-sm small">
+                            <h5 class="fw-bold mb-3 text-primary">Chi tiết số liệu</h5>
+                            <table class="table table-sm">
                                 <thead><tr><th>Tháng/Năm</th><th class="text-end">Doanh thu</th></tr></thead>
                                 <tbody id="monthlyTableBody"></tbody>
                             </table>
@@ -138,13 +170,33 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    let authHeader = "", cart = [], currentUser = null, cModal, pModal, myChart;
+    let authHeader = "", cart = [], currentUser = null, cModal, pModal, rModal, myChart;
 
     window.onload = () => {
         cModal = new bootstrap.Modal(document.getElementById('cartModal'));
         pModal = new bootstrap.Modal(document.getElementById('productModal'));
+        rModal = new bootstrap.Modal(document.getElementById('registerModal'));
     };
 
+    // ĐĂNG KÝ
+    async function handleRegister() {
+        const username = document.getElementById('regUser').value;
+        const password = document.getElementById('regPass').value;
+        const fullName = document.getElementById('regFullName').value;
+        if(!username || !password || !fullName) return alert("Vui lòng nhập đủ thông tin!");
+
+        const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, fullName })
+        });
+        if(res.ok) {
+            alert("Đăng ký thành công!");
+            rModal.hide();
+        } else alert("Lỗi đăng ký!");
+    }
+
+    // ĐĂNG NHẬP
     async function login() {
         const u = document.getElementById('loginUser').value, p = document.getElementById('loginPass').value;
         authHeader = 'Basic ' + btoa(u + ":" + p);
@@ -156,7 +208,6 @@
             document.getElementById('mainPage').classList.remove('hidden');
             document.getElementById('userDisplay').innerText = currentUser.username;
 
-            // Phân quyền hiển thị tab
             if(currentUser.role === 'admin') {
                 document.getElementById('nav-stats').classList.remove('hidden');
                 document.getElementById('cartBtn').classList.add('hidden');
@@ -174,17 +225,16 @@
         document.getElementById('tab-' + t).classList.remove('hidden');
         document.getElementById('nav-' + t).classList.add('active');
         document.getElementById('tabTitle').innerText = t === 'shop' ? 'Cửa hàng' : (t === 'orders' ? 'Lịch sử mua hàng' : 'Thống kê doanh thu');
-
         if(t === 'shop') loadProducts();
         if(t === 'orders') loadOrders();
         if(t === 'stats') loadStats();
     }
 
+    // SẢN PHẨM
     async function loadProducts() {
         const res = await fetch('/api/products', { headers: { 'Authorization': authHeader } });
         const data = await res.json();
         const container = document.getElementById('tab-shop');
-
         if(currentUser.role === 'admin') {
             container.innerHTML = `
                 <div class="col-12 text-end mb-3"><button class="btn btn-success" onclick="openProdForm()">+ Thêm sản phẩm</button></div>
@@ -217,83 +267,70 @@
         cModal.show();
     }
 
+    // THANH TOÁN (ĐÃ FIX LỖI MAPPING)
     async function processOrder() {
+        if(cart.length === 0) return alert("Giỏ hàng trống!");
+
+        const payload = {
+            customerId: currentUser.id,
+            items: cart.map(i => ({ productId: i.productId, quantity: i.quantity }))
+        };
+
         const res = await fetch('/api/orders', {
             method: 'POST',
             headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ customerId: currentUser.id, items: cart })
+            body: JSON.stringify(payload)
         });
-        if(res.ok) { alert("Đặt hàng thành công!"); cart = []; cModal.hide(); showTab('orders'); }
-    }
 
-    async function loadOrders() {
-        try {
-            const url = (currentUser.role === 'admin') ? '/api/orders/all' : '/api/orders';
-            const res = await fetch(url, { headers: { 'Authorization': authHeader } });
-            const data = await res.json();
-            const tableBody = document.getElementById('orderTable');
-
-            if (!data || data.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">Chưa có đơn hàng nào.</td></tr>';
-                return;
-            }
-
-            tableBody.innerHTML = data.map(o => `
-                <tr>
-                    <td class="fw-bold text-primary">#ORD-${o.id}</td>
-                    <td>${o.orderDate ? new Date(o.orderDate).toLocaleString('vi-VN') : 'N/A'}</td>
-                    <td class="fw-bold text-danger">${(o.totalAmount || 0).toLocaleString()} đ</td>
-                    <td><span class="badge bg-success">Thành công</span></td>
-                </tr>`).join('');
-        } catch (e) {
-            document.getElementById('orderTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Lỗi kết nối máy chủ!</td></tr>';
+        if(res.ok) {
+            alert("Đặt hàng thành công!");
+            cart = [];
+            document.getElementById('cartCount').innerText = "0";
+            cModal.hide();
+            showTab('orders');
+        } else {
+            alert("Lỗi thanh toán!");
         }
     }
 
-    async function loadStats() {
-        try {
-            // 1. Load Tổng quát
-            const resStats = await fetch('/api/statistics', { headers: { 'Authorization': authHeader } });
-            const d = await resStats.json();
-            document.getElementById('statsArea').innerHTML = `
-                <div class="col-md-6"><div class="card p-4 stat-card"><h6>Doanh thu tổng</h6><h3>${(d.totalRevenue||0).toLocaleString()} VNĐ</h3></div></div>
-                <div class="col-md-6"><div class="card p-4 stat-card" style="border-color: #27ae60"><h6>Số đơn hàng</h6><h3>${d.totalOrders||0}</h3></div></div>`;
-
-            // 2. Load Doanh thu tháng
-            const resMonthly = await fetch('/api/statistics/monthly', { headers: { 'Authorization': authHeader } });
-            const monthlyData = await resMonthly.json();
-
-            // Sắp xếp dữ liệu theo thời gian tăng dần để vẽ biểu đồ
-            const sortedData = [...monthlyData].reverse();
-            const labels = sortedData.map(row => `T${row[0]}/${row[1]}`);
-            const values = sortedData.map(row => row[2]);
-
-            // Cập nhật Bảng số liệu
-            document.getElementById('monthlyTableBody').innerHTML = monthlyData.map(row => `
-                <tr><td>Tháng ${row[0]}/${row[1]}</td><td class="text-end fw-bold">${row[2].toLocaleString()}đ</td></tr>
-            `).join('');
-
-            // Vẽ Biểu đồ
-            if (myChart) myChart.destroy(); // Xóa biểu đồ cũ nếu có
-            const ctx = document.getElementById('revenueChart').getContext('2d');
-            myChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Doanh thu (VNĐ)',
-                        data: values,
-                        backgroundColor: 'rgba(52, 152, 219, 0.7)',
-                        borderColor: 'rgba(52, 152, 219, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: { responsive: true, scales: { y: { beginAtZero: true } } }
-            });
-        } catch (e) { console.error("Lỗi thống kê:", e); }
+    // ĐƠN HÀNG
+    async function loadOrders() {
+        const url = (currentUser.role === 'admin') ? '/api/orders/all' : '/api/orders';
+        const res = await fetch(url, { headers: { 'Authorization': authHeader } });
+        const data = await res.json();
+        document.getElementById('orderTable').innerHTML = data.map(o => `
+            <tr><td class="fw-bold text-primary">#ORD-${o.id}</td><td>${new Date(o.orderDate).toLocaleString()}</td>
+            <td class="text-danger fw-bold">${(o.totalAmount||0).toLocaleString()}đ</td>
+            <td><span class="badge bg-success">Thành công</span></td></tr>`).join('');
     }
 
-    // CRUD Admin sản phẩm (rút gọn)
+    // THỐNG KÊ
+    async function loadStats() {
+        const resStats = await fetch('/api/statistics', { headers: { 'Authorization': authHeader } });
+        const d = await resStats.json();
+        document.getElementById('statsArea').innerHTML = `
+            <div class="col-md-6"><div class="card p-4 stat-card"><h6>Doanh thu tổng</h6><h3>${(d.totalRevenue||0).toLocaleString()} VNĐ</h3></div></div>
+            <div class="col-md-6"><div class="card p-4 stat-card" style="border-color: #27ae60"><h6>Số đơn hàng</h6><h3>${d.totalOrders||0}</h3></div></div>`;
+
+        const resMonthly = await fetch('/api/statistics/monthly', { headers: { 'Authorization': authHeader } });
+        const monthlyData = await resMonthly.json();
+        const sortedData = [...monthlyData].reverse();
+
+        document.getElementById('monthlyTableBody').innerHTML = monthlyData.map(row => `
+            <tr><td>Tháng ${row[0]}/${row[1]}</td><td class="text-end fw-bold">${(row[2]||0).toLocaleString()}đ</td></tr>
+        `).join('');
+
+        if (myChart) myChart.destroy();
+        myChart = new Chart(document.getElementById('revenueChart'), {
+            type: 'bar',
+            data: {
+                labels: sortedData.map(row => `T${row[0]}/${row[1]}`),
+                datasets: [{ label: 'Doanh thu (VNĐ)', data: sortedData.map(row => row[2]), backgroundColor: '#3498db' }]
+            }
+        });
+    }
+
+    // ADMIN: PRODUCT CRUD
     function openProdForm(p = null) {
         document.getElementById('prodId').value = p ? p.id : '';
         document.getElementById('prodName').value = p ? p.name : '';
@@ -301,17 +338,17 @@
         document.getElementById('prodStock').value = p ? p.stockQuantity : '';
         pModal.show();
     }
+
     async function saveProduct() {
         const id = document.getElementById('prodId').value;
-        const prod = {
-            name: document.getElementById('prodName').value,
-            price: parseFloat(document.getElementById('prodPrice').value),
-            stockQuantity: parseInt(document.getElementById('prodStock').value)
-        };
         const res = await fetch(id ? `/api/products/${id}` : '/api/products', {
             method: id ? 'PUT' : 'POST',
             headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
-            body: JSON.stringify(prod)
+            body: JSON.stringify({
+                name: document.getElementById('prodName').value,
+                price: parseFloat(document.getElementById('prodPrice').value),
+                stockQuantity: parseInt(document.getElementById('prodStock').value)
+            })
         });
         if(res.ok) { pModal.hide(); loadProducts(); }
     }
